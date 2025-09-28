@@ -5,8 +5,15 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-// 简化的插件处理 require 引入的静态资源
-function requireAssetsPlugin() {
+// 增强的插件处理 require 引入的静态资源
+function requireAssetsPlugin(options = {}) {
+  const { 
+    inline = true,           // 是否内联为base64
+    limit = 10 * 1024,      // 内联大小限制（字节）
+    outputDir = 'dist/assets', // 输出目录
+    publicPath = './dist/assets/'   // 公共路径
+  } = options;
+  
   return {
     name: 'require-assets',
     
@@ -22,21 +29,32 @@ function requireAssetsPlugin() {
           const resolvedPath = path.resolve(path.dirname(id), filePath);
           
           if (fs.existsSync(resolvedPath)) {
-            // 读取文件并生成哈希
             const buffer = fs.readFileSync(resolvedPath);
-            const hash = crypto.createHash('md5').update(buffer).digest('hex').slice(0, 16);
-            const ext = path.extname(filePath);
-            const name = path.basename(filePath, ext);
-            const fileName = `${name}.${hash}${ext}`;
+            const fileSize = buffer.length;
+            const ext = path.extname(filePath).slice(1); // 去掉点号
+            const mimeType = getMimeType(ext);
             
-            // 复制文件到 assets 目录
-            const assetsDir = 'dist/assets';
-            if (!fs.existsSync(assetsDir)) {
-              fs.mkdirSync(assetsDir, { recursive: true });
+            // 根据文件大小和配置决定处理方式
+            if (inline && fileSize <= limit) {
+              // 内联为 base64
+              const base64 = buffer.toString('base64');
+              return `"data:${mimeType};base64,${base64}"`;
+            } else {
+              // 复制文件并返回路径
+              const hash = crypto.createHash('md5').update(buffer).digest('hex').slice(0, 16);
+              const name = path.basename(filePath, path.extname(filePath));
+              const fileName = `${name}.${hash}.${ext}`;
+              
+              // 确保输出目录存在
+              if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+              }
+              
+              // 复制文件
+              fs.writeFileSync(path.join(outputDir, fileName), buffer);
+              
+              return `"${publicPath}${fileName}"`;
             }
-            fs.writeFileSync(path.join(assetsDir, fileName), buffer);
-            
-            return `"./assets/${fileName}"`;
           }
           
           return match;
@@ -48,6 +66,22 @@ function requireAssetsPlugin() {
       return null;
     }
   };
+}
+
+// 获取 MIME 类型
+function getMimeType(ext) {
+  const mimeTypes = {
+    'png': 'image/png',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'gif': 'image/gif',
+    'svg': 'image/svg+xml',
+    'webp': 'image/webp',
+    'ico': 'image/x-icon',
+    'bmp': 'image/bmp',
+    'tiff': 'image/tiff'
+  };
+  return mimeTypes[ext.toLowerCase()] || 'application/octet-stream';
 }
 
 export default {
@@ -62,7 +96,12 @@ export default {
       browser: true,
       preferBuiltins: false
     }),
-    requireAssetsPlugin(),
+    requireAssetsPlugin({
+      inline: true,           // 启用内联
+      limit: 10 * 1024,      // 10KB 以下内联为 base64
+      outputDir: 'dist/assets',
+      publicPath: './dist/assets/'
+    }),
     commonjs(),
     terser({
       compress: true,

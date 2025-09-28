@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rollup 静态资源处理演示</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .demo-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+
+        .image-demo {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin: 10px 0;
+        }
+
+        .image-demo img {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .code-block {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+
+        .info {
+            background: #e7f3ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🎯 Rollup 静态资源处理演示</h1>
+
+    <div class="demo-section">
+        <h2>📋 功能说明</h2>
+        <p>这个演示展示了我们的 Rollup 配置如何处理不同类型的静态资源：</p>
+        <ul>
+            <li><strong>小文件（≤50KB）</strong>：自动内联为 base64 数据URI</li>
+            <li><strong>大文件（>50KB）</strong>：复制到 assets 目录，返回带哈希的文件路径</li>
+        </ul>
+    </div>
+
+    <div class="demo-section">
+        <h2>🖼️ 资源展示</h2>
+        <div class="image-demo">
+            <div>
+                <h3>大图片（复制到 assets 目录）</h3>
+                <img id="largeImage" alt="大图片" style="max-width: 200px; max-height: 200px;">
+                <div class="info">
+                    <strong>处理方式：</strong>文件复制 + 哈希文件名<br>
+                    <strong>优势：</strong>避免大文件影响打包体积
+                </div>
+            </div>
+            <div>
+                <h3>小图标（内联为 base64）</h3>
+                <img id="smallIcon" alt="小图标" style="width: 100px; height: 100px;">
+                <div class="info">
+                    <strong>处理方式：</strong>base64 内联<br>
+                    <strong>优势：</strong>减少HTTP请求，直接可用
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>📝 源代码</h2>
+        <h3>入口文件 (src/index.js)</h3>
+        <div class="code-block">
+            const img = require('./default.png'); // 大文件，会被复制到assets目录
+            const testIcon = require('./test.svg'); // 小文件，会被内联为base64
+            import { switchImg } from './switch/index';
+            export { img, testIcon, switchImg };
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>🔧 打包结果</h2>
+        <h3>生成的文件内容</h3>
+        <div class="code-block">
+            // 大图片：返回文件路径
+            const img = "./assets/default.a25b3312e2688a1a.png";
+
+            // 小图标：返回 base64 数据URI
+            const testIcon =
+            "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzAwN2JmZiIvPgogIDx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+VGVzdDwvdGV4dD4KPC9zdmc+Cg==";
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>⚙️ 配置选项</h2>
+        <div class="code-block">
+            requireAssetsPlugin({
+            inline: true, // 启用内联
+            limit: 50 * 1024, // 50KB 以下内联为 base64
+            outputDir: 'dist/assets',
+            publicPath: './assets/'
+            })
+        </div>
+    </div>
+
+    <script type="module">
+        // 导入打包后的模块
+        import { img, testIcon, switchImg } from './dist/index.esm-browser.js';
+
+        // 显示图片
+        document.getElementById('largeImage').src = img;
+        document.getElementById('smallIcon').src = testIcon;
+
+        // 输出到控制台
+        console.log('大图片路径:', img);
+        console.log('小图标base64:', testIcon.substring(0, 50) + '...');
+        console.log('切换图片函数:', switchImg);
+
+        // 测试切换图片功能
+        const switchBtn = document.createElement('button');
+        switchBtn.textContent = '切换图片';
+        switchBtn.onclick = () => {
+            const newImg = switchImg();
+            console.log('newImg', newImg);
+            const dom = document.getElementById('largeImage')
+            dom.src = newImg;
+            console.log('切换到:', newImg);
+        };
+        document.querySelector('.demo-section:nth-child(3)').appendChild(switchBtn);
+    </script>
+</body>
+
+</html>
